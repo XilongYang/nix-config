@@ -20,7 +20,6 @@
 
     # Application
     bash-language-server
-    cloudflared
     neovim
     nixd
     nodejs
