@@ -11,6 +11,8 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
+    kiln.url = "github:XilongYang/kiln";
+    kiln.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs@{nixpkgs, home-manager, ...}:
@@ -30,6 +32,9 @@
       system = "x86_64-linux";
       modules = [
         ./os.d/os.nix
+        ({ ... }: {
+          nixpkgs.overlays = [ inputs.kiln.overlays.default ];
+        })
         home-manager.nixosModules.home-manager
         homeManagerModule
       ];

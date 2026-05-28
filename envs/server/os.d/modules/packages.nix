@@ -20,10 +20,17 @@
 
     # Application
     bash-language-server
+    vscode-langservers-extracted
+    typescript-language-server
     neovim
     nixd
     nodejs
     codex
     codex-acp
+    kiln
+
+    # CodeX Dependencies
+    bubblewrap
+
   ];
 }

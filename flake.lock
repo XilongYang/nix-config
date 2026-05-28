@@ -42,6 +42,27 @@
         "type": "github"
       }
     },
+    "kiln": {
+      "inputs": {
+        "nixpkgs": [
+          "server",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1779981360,
+        "narHash": "sha256-dENuRmp606Cuie+4GWdDRN4VzPI0/YH2/Mq3Q/qszNY=",
+        "owner": "XilongYang",
+        "repo": "kiln",
+        "rev": "074dda1735fad650cfc7e552091c806d40c71aea",
+        "type": "github"
+      },
+      "original": {
+        "owner": "XilongYang",
+        "repo": "kiln",
+        "type": "github"
+      }
+    },
     "mac": {
       "inputs": {
         "home-manager": "home-manager",
@@ -75,11 +96,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1775036866,
-        "narHash": "sha256-ZojAnPuCdy657PbTq5V0Y+AHKhZAIwSIT2cb8UgAz/U=",
+        "lastModified": 1779560665,
+        "narHash": "sha256-tpyBcxPpcQb8ukyNF7DoCwfSY3VPsxHoYwj00Cayv5o=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "6201e203d09599479a3b3450ed24fa81537ebc4e",
+        "rev": "64c08a7ca051951c8eae34e3e3cb1e202fe36786",
         "type": "github"
       },
       "original": {
@@ -115,6 +136,7 @@
     "server": {
       "inputs": {
         "home-manager": "home-manager_2",
+        "kiln": "kiln",
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
