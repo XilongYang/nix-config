@@ -27,11 +27,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1779981360,
-        "narHash": "sha256-dENuRmp606Cuie+4GWdDRN4VzPI0/YH2/Mq3Q/qszNY=",
+        "lastModified": 1779983296,
+        "narHash": "sha256-hZ/wYAAc/3SJc/ainrgv7yjvcPrICV9MgvpLPYUUB8Y=",
         "owner": "XilongYang",
         "repo": "kiln",
-        "rev": "074dda1735fad650cfc7e552091c806d40c71aea",
+        "rev": "8761d651cca7729c5c9418e09a2b8c99ba2fdcdc",
         "type": "github"
       },
       "original": {
