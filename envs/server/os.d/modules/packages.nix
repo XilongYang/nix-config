@@ -13,6 +13,7 @@
     openssl
     pass
     pinentry-curses
+    python3
     ripgrep
     tree
     tmux
