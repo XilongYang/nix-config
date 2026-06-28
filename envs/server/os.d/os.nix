@@ -14,7 +14,13 @@ in
 
 {
   environment.variables.EDITOR = "nvim";
-  environment.enableAllTerminfo = true;
+  # `enableAllTerminfo` currently pulls in `termite`, which fails to build via
+  # `vte` on the pinned nixpkgs revision. Keep a narrow set of terminal entries
+  # that are actually useful for remote sessions instead.
+  environment.systemPackages = with pkgs; [
+    kitty.terminfo
+    tmux.terminfo
+  ];
 
   # Use the Nix-Flakes and nix-command
   nix.settings.experimental-features = ["nix-command" "flakes"];

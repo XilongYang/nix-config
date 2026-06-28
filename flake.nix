@@ -26,17 +26,7 @@
     };
   };
 
-  outputs = { nixpkgs, server, mac, ... }:
-  let
-    system = "x86_64-linux";
-    pkgs = import nixpkgs { inherit system; };
-  in {
-    devShells.${system}.default = pkgs.mkShell {
-      packages = with pkgs; [
-        lua-language-server
-      ];
-    };
-
+  outputs = { nixpkgs, server, mac, ... }: {
     nixosConfigurations =
       (server.nixosConfigurations or {});
 

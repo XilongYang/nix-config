@@ -6,6 +6,7 @@ let
     entries.${name} == "regular" && lib.hasSuffix ".nix" name
   ) (builtins.attrNames entries);
   sorted = lib.sort (a: b: a < b) names;
+  commonPackages = import ../../base/common-packages.nix { inherit pkgs; };
 in
 {
   home.homeDirectory = "/Users/${config.home.username}";
@@ -14,16 +15,11 @@ in
 
   imports = builtins.map (name: dir + "/${name}") sorted;
 
-  home.packages = with pkgs; [
+  home.packages = commonPackages ++ (with pkgs; [
     coreutils
-    git
     macism
-    neovim
     pinentry_mac
-    ripgrep
-    codex
-    codex-acp
- ];
+  ]);
 
   # macOS 上 GPG agent 走 pinentry-mac
   services.gpg-agent = {

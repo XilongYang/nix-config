@@ -1,12 +1,14 @@
 { config, pkgs, ... }:
+let
+  commonPackages = import ../../../base/common-packages.nix { inherit pkgs; };
+in
 {
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   nixpkgs.config.allowUnfree = true;
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = commonPackages ++ (with pkgs; [
     # Base
     curl
-    git
     git-filter-repo
     gnupg
     openssh
@@ -14,24 +16,16 @@
     pass
     pinentry-curses
     python3
-    ripgrep
     tree
     tmux
     zsh
 
     # Application
-    bash-language-server
-    vscode-langservers-extracted
-    typescript-language-server
-    neovim
-    nixd
     nodejs
-    codex
-    codex-acp
     kiln
 
     # CodeX Dependencies
     bubblewrap
 
-  ];
+  ]);
 }
