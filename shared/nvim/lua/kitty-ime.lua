@@ -64,7 +64,7 @@ function M.setup()
   vim.api.nvim_create_autocmd({ "InsertLeave" }, {
     group = group,
     callback = function()
-      M.send("normal", true)
+      M.send("normal")
     end,
   })
 end
