@@ -7,7 +7,6 @@
     ./modules/gpg-agent.nix
     ./modules/kitty.nix
     ./modules/packages.nix
-    ./modules/toggle-ime.nix
     ./modules/zsh.nix
   ];
 }
