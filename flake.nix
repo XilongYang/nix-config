@@ -1,5 +1,11 @@
 {
-  description = "Root router flake (delegates to env flakes)";
+  description = "Xilong's NixOS and Home Manager configuration";
+
+  nixConfig = {
+    substituters = [
+      "https://cache.nixos.org"
+    ];
+  };
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -11,26 +17,36 @@
       url = "github:XilongYang/kiln";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    server = {
-      url = "path:./envs/server";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.home-manager.follows = "home-manager";
-      inputs.kiln.follows = "kiln";
-    };
-
-    mac = {
-      url = "path:./envs/mac";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.home-manager.follows = "home-manager";
-    };
   };
 
-  outputs = { nixpkgs, server, mac, ... }: {
-    nixosConfigurations =
-      (server.nixosConfigurations or {});
+  outputs = inputs@{ nixpkgs, home-manager, kiln, ... }:
+    let
+      kilnOverlayModule = {
+        nixpkgs.overlays = [ kiln.overlays.default ];
+      };
+    in
+    {
+      nixosConfigurations.server = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit inputs; };
+        modules = [
+          ./targets/server
+          kilnOverlayModule
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = false;
+            home-manager.users.xilong.imports = [ ./targets/server/home-manager ];
+          }
+        ];
+      };
 
-    homeConfigurations = 
-      (mac.homeConfigurations or {});
-  };
+      homeConfigurations.mac = home-manager.lib.homeManagerConfiguration {
+        pkgs = import nixpkgs {
+          system = "aarch64-darwin";
+          config.allowUnfree = true;
+        };
+        modules = [ ./targets/mac ];
+      };
+    };
 }

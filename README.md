@@ -1,98 +1,98 @@
 # NixOS Configuration
 
-Personal flake-based setup with two active targets:
+Single-flake personal setup with two targets:
 
-- `server`: NixOS system + integrated Home Manager
+- `server`: NixOS system with integrated Home Manager
 - `mac`: standalone Home Manager profile for macOS
 
-The root `flake.nix` is a small router that re-exports outputs from `envs/server` and `envs/mac`.
-Dependency versions are pinned by the single root `flake.lock`; the env flakes follow those root inputs.
+## Layout
 
-## Structure
+The repository is split by responsibility:
+
+- `targets/`: concrete deployment targets
+- `shared/`: reusable modules, packages, and Neovim runtime
 
 ```text
 .
-├── assets/
-│   └── nvim/                  # Shared Neovim config
-├── envs/
-│   ├── base/
-│   │   └── home.d/            # Shared Home Manager defaults
-│   ├── server/
-│   │   ├── home.d/            # Server-only Home Manager modules
-│   │   ├── os.d/              # NixOS modules
-│   │   └── flake.nix
-│   └── mac/
-│       ├── home.d/            # macOS-only Home Manager modules
-│       └── flake.nix
+├── targets/
+│   ├── mac/
+│   │   ├── default.nix
+│   │   └── modules/
+│   └── server/
+│       ├── default.nix
+│       ├── config/
+│       ├── home-manager/
+│       └── services/
+├── shared/
+│   ├── common-pkgs.nix
+│   ├── home-manager/
+│   │   ├── default.nix
+│   │   └── modules/
+│   └── nvim/
 ├── flake.nix
 └── README.md
 ```
 
-Both `home.d/modules` and `os.d/modules` are loaded dynamically (`*.nix`, sorted by filename).
+## Entrypoints
 
-## Managed Scope
+- `server` resolves from `targets/server`
+- `mac` resolves from `targets/mac`
+- shared Home Manager defaults resolve from `shared/home-manager`
 
-- Server NixOS modules: boot, hardware, network, user, sshd, packages, cloudflared, gpg-agent, snapshot
-- Shared Home Manager defaults: `git`, `ssh`, `zsh`, `nvim`, GC settings
-- Server Home Manager modules: `tmux`
-- macOS Home Manager modules: `zsh`, `kitty`, mac-specific packages/services
-- Shared Neovim runtime in `assets/nvim`
+`flake.nix` wires only the top-level targets:
 
-## Common Commands
+- `nixosConfigurations.server`
+- `homeConfigurations.mac`
 
-Run from repository root.
+## Target Roles
+
+- `targets/server/default.nix` assembles the NixOS machine
+- `targets/server/config/` holds machine-local configuration such as boot, networking, packages, users, and storage
+- `targets/server/services/` holds server-only NixOS service modules
+- `targets/server/home-manager/` holds the Home Manager entry for the server user plus server-only modules
+- `targets/mac/default.nix` assembles the macOS Home Manager profile
+- `targets/mac/modules/` holds mac-only Home Manager modules
+
+## Shared Roles
+
+- `shared/home-manager/default.nix` imports the common Home Manager modules
+- `shared/home-manager/modules/` contains shared `git`, `ssh`, `zsh`, `nvim`, and base settings
+- `shared/common-pkgs.nix` contains shared development packages
+- `shared/nvim/` contains the Neovim runtime synced into Home Manager
+
+## Commands
+
+Run from the repository root.
 
 ### Server
-
-Check configuration:
 
 ```bash
 nix flake show
 nix flake check
 sudo nixos-rebuild test --flake .#server
-```
-
-Apply the currently pinned versions in `flake.lock`:
-
-```bash
-sudo nixos-rebuild switch --flake .#server
-```
-
-Upgrade inputs, then apply them:
-
-```bash
-nix flake update
 sudo nixos-rebuild switch --flake .#server
 ```
 
 ### macOS
 
-Check configuration:
-
 ```bash
 nix flake show
 nix flake check
 home-manager build --flake .#mac
-```
-
-Apply the currently pinned versions in `flake.lock`:
-
-```bash
 home-manager switch --flake .#mac
 ```
 
-Upgrade inputs, then apply them:
+### Update Inputs
 
 ```bash
 nix flake update
-home-manager switch --flake .#mac
 ```
+
+Then re-apply the target you care about.
 
 ## Notes
 
-- From the repository root, `server` and `mac` use the same pinned input revisions from the root `flake.lock`, including the same `nixpkgs` and `home-manager` versions.
-- They do not produce the same package set byte-for-byte: `server` builds for `x86_64-linux`, `mac` builds for `aarch64-darwin`, and `server` also includes the `kiln` input.
-- `envs/server` and `envs/mac` are implementation details of the root flake. Update and switch commands should be run from the repository root.
-- Both targets follow `nixpkgs` from `nixos-unstable`.
-- `server` embeds Home Manager via `home-manager.nixosModules.home-manager`.
-- `mac` is user-scoped only; it does not manage the full OS.
+- Both targets share the same root `flake.lock`
+- `server` uses `x86_64-linux`
+- `mac` uses `aarch64-darwin`
+- `server` applies the `kiln` overlay

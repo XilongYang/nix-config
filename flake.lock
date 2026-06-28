@@ -41,25 +41,6 @@
         "type": "github"
       }
     },
-    "mac": {
-      "inputs": {
-        "home-manager": [
-          "home-manager"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "path": "./envs/mac",
-        "type": "path"
-      },
-      "original": {
-        "path": "./envs/mac",
-        "type": "path"
-      },
-      "parent": []
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1779560665,
@@ -80,32 +61,8 @@
       "inputs": {
         "home-manager": "home-manager",
         "kiln": "kiln",
-        "mac": "mac",
-        "nixpkgs": "nixpkgs",
-        "server": "server"
+        "nixpkgs": "nixpkgs"
       }
-    },
-    "server": {
-      "inputs": {
-        "home-manager": [
-          "home-manager"
-        ],
-        "kiln": [
-          "kiln"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "path": "./envs/server",
-        "type": "path"
-      },
-      "original": {
-        "path": "./envs/server",
-        "type": "path"
-      },
-      "parent": []
     }
   },
   "root": "root",
