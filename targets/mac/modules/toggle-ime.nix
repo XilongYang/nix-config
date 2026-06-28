@@ -7,35 +7,33 @@ let
       pkgs.macism
     ];
     text = ''
+      #!/usr/bin/env bash
       set -euo pipefail
-
+      
       ENGLISH="com.apple.keylayout.ABC"
       CHINESE="com.apple.inputmethod.SCIM.WBX"
       JAPANESE="com.apple.inputmethod.Kotoeri.RomajiTyping.Japanese"
-
-      state_dir="''${XDG_STATE_HOME:-$HOME/.local/state}"
-      state_file="$state_dir/toggle-ime-last"
-
-      mkdir -p "$state_dir"
-
+      
+      state_file="/tmp/toggle-ime-last-$USER"
+      
       current="$(macism)"
-      last_ime="$CHINESE"
-
-      if [ -f "$state_file" ]; then
-        saved="$(cat "$state_file")"
-        if [ "$saved" = "$CHINESE" ] || [ "$saved" = "$JAPANESE" ]; then
-          last_ime="$saved"
-        fi
-      fi
-
+      
       case "$current" in
         "$ENGLISH")
-          macism "$last_ime"
+          if IFS= read -r saved < "$state_file" 2>/dev/null &&
+             { [ "$saved" = "$CHINESE" ] || [ "$saved" = "$JAPANESE" ]; }; then
+            macism "$saved"
+          else
+            macism "$CHINESE"
+          fi
           ;;
+      
         "$CHINESE" | "$JAPANESE")
+          mkdir -p "$(dirname "$state_file")"
           printf '%s\n' "$current" > "$state_file"
           macism "$ENGLISH"
           ;;
+      
         *)
           macism "$ENGLISH"
           ;;
