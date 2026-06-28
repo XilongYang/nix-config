@@ -6,6 +6,7 @@ Personal flake-based setup with two active targets:
 - `mac`: standalone Home Manager profile for macOS
 
 The root `flake.nix` is a small router that re-exports outputs from `envs/server` and `envs/mac`.
+When evaluated from the repository root, dependency versions are pinned by the root `flake.lock`; the env flakes follow those root inputs.
 
 ## Structure
 
