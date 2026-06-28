@@ -33,7 +33,7 @@ let
 
 
     def _write_last(value):
-        if value and value != ENGLISH:
+        if value:
             try:
                 with open(STATE_FILE, "w", encoding="utf-8") as f:
                     f.write(value + "\n")
@@ -43,7 +43,7 @@ let
 
     def _switch_to_normal():
         current = _macism()
-        if current and current != ENGLISH:
+        if current:
             _write_last(current)
         if current != ENGLISH:
             _macism(ENGLISH)
@@ -51,7 +51,7 @@ let
 
     def _switch_to_insert():
         saved = _read_last()
-        if saved and saved != ENGLISH:
+        if saved:
             _macism(saved)
 
 

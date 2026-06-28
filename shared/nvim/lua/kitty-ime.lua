@@ -8,7 +8,17 @@ local values = {
 local last_sent
 
 local function is_kitty()
-  return vim.env.KITTY_WINDOW_ID ~= nil or (vim.env.TERM or ""):find("kitty", 1, true) ~= nil
+  return vim.env.TMUX ~= nil
+    or vim.env.KITTY_WINDOW_ID ~= nil
+    or (vim.env.TERM or ""):find("kitty", 1, true) ~= nil
+end
+
+local function passthrough(seq)
+  if vim.env.TMUX == nil then
+    return seq
+  end
+
+  return "\x1bPtmux;\x1b" .. seq .. "\x1b\\"
 end
 
 function M.send(mode, force)
@@ -23,7 +33,7 @@ function M.send(mode, force)
   last_sent = mode
   local seq = "\x1b]1337;SetUserVar=NVIM_MODE=" .. values[mode] .. "\x07"
 
-  io.stdout:write(seq)
+  io.stdout:write(passthrough(seq))
   io.stdout:flush()
 end
 
