@@ -1,5 +1,6 @@
 require("lsp-keymap")
 require("opts")
+require("kitty-ime").setup()
 require("key")
 require("lazy-loader")
 require("colorscheme")
