@@ -8,6 +8,7 @@
   };
 
   home.stateVersion = "23.11";
+  home.enableNixpkgsReleaseCheck = false;
   programs.home-manager.enable = true;
 
   nix.gc = {

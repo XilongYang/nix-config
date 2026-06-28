@@ -93,6 +93,8 @@ Then re-apply the target you care about.
 ## Notes
 
 - Both targets share the same root `flake.lock`
+- `nixpkgs` tracks `nixos-unstable`, and `home-manager` tracks `master` to keep the macOS and NixOS module surface aligned
 - `server` uses `x86_64-linux`
 - `mac` uses `aarch64-darwin`
 - `server` applies the `kiln` overlay
+- Neovim plugin management is intentionally split: Nix distributes the config in `shared/nvim/`, while `lazy.nvim` resolves and downloads plugins at runtime
