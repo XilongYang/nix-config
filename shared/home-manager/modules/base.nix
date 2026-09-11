@@ -1,5 +1,10 @@
+{ config, ... }:
 {
   home.username = "xilong";
+
+  home.sessionVariables = {
+    CLAUDE_CONFIG_DIR = "${config.xdg.configHome}/claude";
+  };
 
   programs.direnv = {
     enable = true;
