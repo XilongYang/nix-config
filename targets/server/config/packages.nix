@@ -10,6 +10,8 @@ in
     git-filter-repo
     gcc
     gnupg
+    man-pages
+    man-pages-posix
     openssh
     openssl
     pass
