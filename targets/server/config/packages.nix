@@ -21,7 +21,6 @@ in
     tmux
     zsh
     nodejs
-    kiln
     bubblewrap
     kitty.terminfo
     tmux.terminfo

@@ -13,25 +13,15 @@
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    kiln = {
-      url = "github:XilongYang/kiln";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = inputs@{ nixpkgs, home-manager, kiln, ... }:
-    let
-      kilnOverlayModule = {
-        nixpkgs.overlays = [ kiln.overlays.default ];
-      };
-    in
+  outputs = inputs@{ nixpkgs, home-manager, ... }:
     {
       nixosConfigurations.server = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; };
         modules = [
           ./targets/server
-          kilnOverlayModule
           home-manager.nixosModules.home-manager
           {
             home-manager.useGlobalPkgs = true;

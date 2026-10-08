@@ -21,26 +21,6 @@
         "type": "github"
       }
     },
-    "kiln": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1781272524,
-        "narHash": "sha256-8J8x8F9ZzzvABPdtLdVd6kndmm0C6eIb/COEWTpRMZg=",
-        "owner": "XilongYang",
-        "repo": "kiln",
-        "rev": "89af323b18e8129816c6cdc881109641e45208ce",
-        "type": "github"
-      },
-      "original": {
-        "owner": "XilongYang",
-        "repo": "kiln",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1788752844,
@@ -60,7 +40,6 @@
     "root": {
       "inputs": {
         "home-manager": "home-manager",
-        "kiln": "kiln",
         "nixpkgs": "nixpkgs"
       }
     }
