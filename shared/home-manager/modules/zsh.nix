@@ -10,6 +10,7 @@
       xnix-gc = "sudo nix store gc --debug";
       vim = "nvim";
       pd = "curl -F \"c=@-\" \"https://fars.ee/\"";
+      kiln = "nix run --refresh github:XilongYang/kiln";
     };
     initContent = ''
       PATH=$PATH:$HOME/.local/bin
