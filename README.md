@@ -71,7 +71,7 @@ of living inside a Nix string.
 ## Shared Roles
 
 - `shared/home-manager/default.nix` imports the common Home Manager modules
-- `shared/home-manager/modules/` contains shared `git`, `ssh`, `zsh`, `nvim`, and base settings
+- `shared/home-manager/modules/` contains shared `git`, `ssh`, `zsh`, `nvim`, `gnupg`, `npm`, and base settings
 - `shared/common-pkgs.nix` contains shared development packages
 
 ## Source Files
@@ -117,5 +117,4 @@ Then re-apply the target you care about.
 - `nixpkgs` tracks `nixos-unstable`, and `home-manager` tracks `master` to keep the macOS and NixOS module surface aligned
 - `server` uses `x86_64-linux`
 - `mac` uses `aarch64-darwin`
-- `server` applies the `kiln` overlay
 - Neovim plugin management is intentionally split: Nix distributes the config in `files/shared/nvim/`, while `lazy.nvim` resolves and downloads plugins at runtime
