@@ -22,7 +22,9 @@
     ./config/users.nix
     ./config/virtualisation.nix
     ./services/btrbk.nix
+    ./services/goeland.nix
     ./services/gpg-agent.nix
+    ./services/rsshub.nix
     ./services/sshd.nix
     ./services/time-machine.nix
   ];

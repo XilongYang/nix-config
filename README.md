@@ -33,6 +33,8 @@ The repository is split by responsibility:
 │   ├── mac/
 │   │   ├── karabiner/karabiner.json
 │   │   └── kitty/kitty-nvim-ime.py
+│   ├── server/
+│   │   └── goeland/allow-loopback.patch
 │   └── shared/
 │       └── nvim/
 ├── flake.nix
@@ -41,9 +43,9 @@ The repository is split by responsibility:
 
 `files/` mirrors the `mac` / `server` / `shared` scoping of the Nix tree. It holds
 verbatim source in its native language — dotfiles that land in `~/.config`
-(nvim, karabiner) as well as scripts that Nix reads in as build inputs — so each
-file can be edited, highlighted, and linted on its own instead of living inside a
-Nix string.
+(nvim, karabiner) as well as patches and scripts that Nix reads in as build
+inputs — so each file can be edited, highlighted, and linted on its own instead
+of living inside a Nix string.
 
 ## Entrypoints
 
@@ -61,6 +63,7 @@ Nix string.
 - `targets/server/default.nix` assembles the NixOS machine
 - `targets/server/config/` holds machine-local configuration such as boot, networking, packages, users, and storage
 - `targets/server/services/` holds server-only NixOS service modules
+- RSS is mail-only: `services/rsshub.nix` runs RSSHub as a podman container bound to `127.0.0.1:1200`, and `services/goeland.nix` mails one merged digest every morning. There is no web reader and nothing is exposed to the network.
 - `targets/server/home-manager/` holds the Home Manager entry for the server user plus server-only modules
 - `targets/mac/default.nix` assembles the macOS Home Manager profile
 - `targets/mac/modules/` holds mac-only Home Manager modules
@@ -75,6 +78,7 @@ Nix string.
 
 - `files/shared/nvim/` holds the Neovim runtime (`init.lua`, `lua/`, `lsp/`) symlinked into Home Manager by `shared/home-manager/modules/nvim.nix`
 - `files/mac/` holds mac-only source: the Karabiner config and the kitty IME watcher
+- `files/server/goeland/allow-loopback.patch` relaxes goeland's hardcoded SSRF guard so it can read the local RSSHub container; applied by an overlay in `targets/server/services/goeland.nix`
 - Modules pull these in via `builtins.readFile` / store-path references, substituting any Nix values through `@placeholder@` tokens so no import-from-derivation is needed
 
 ## Commands

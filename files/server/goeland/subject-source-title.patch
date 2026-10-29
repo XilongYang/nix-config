@@ -1,0 +1,28 @@
+--- a/cmd/run.go
++++ b/cmd/run.go
+@@ -133,14 +133,23 @@
+ }
+ 
+ func formatEmailSubject(source *goeland.Source, entry *goeland.Entry, templateString string) string {
++	// A merge source has no title or name of its own, so a pipe reading one
++	// would stamp every subject with the merge's empty title. Entries fetched
++	// from a feed carry a pointer to the feed they came from; prefer it.
++	// Synthetic entries (the one the digest filter builds) leave Source nil
++	// and still fall back to the pipe's own source.
++	origin := source
++	if entry.Source != nil {
++		origin = entry.Source
++	}
+ 	data := struct {
+ 		EntryTitle  string
+ 		SourceTitle string
+ 		SourceName  string
+ 		Today       time.Time
+ 	}{EntryTitle: entry.Title,
+-		SourceTitle: source.Title,
+-		SourceName:  source.Name,
++		SourceTitle: origin.Title,
++		SourceName:  origin.Name,
+ 		Today:       time.Now()}
+ 	var output bytes.Buffer
+ 	if strings.TrimSpace(templateString) == "" {
