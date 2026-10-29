@@ -33,9 +33,6 @@ The repository is split by responsibility:
 │   ├── mac/
 │   │   ├── karabiner/karabiner.json
 │   │   └── kitty/kitty-nvim-ime.py
-│   ├── server/
-│   │   ├── btrfs/btrfs-auto-snapshot.sh
-│   │   └── minecraft/bedrock.Dockerfile
 │   └── shared/
 │       └── nvim/
 ├── flake.nix
@@ -44,9 +41,9 @@ The repository is split by responsibility:
 
 `files/` mirrors the `mac` / `server` / `shared` scoping of the Nix tree. It holds
 verbatim source in its native language — dotfiles that land in `~/.config`
-(nvim, karabiner) as well as scripts and a Dockerfile that Nix reads in as build
-inputs — so each file can be edited, highlighted, and linted on its own instead
-of living inside a Nix string.
+(nvim, karabiner) as well as scripts that Nix reads in as build inputs — so each
+file can be edited, highlighted, and linted on its own instead of living inside a
+Nix string.
 
 ## Entrypoints
 
@@ -78,7 +75,6 @@ of living inside a Nix string.
 
 - `files/shared/nvim/` holds the Neovim runtime (`init.lua`, `lua/`, `lsp/`) symlinked into Home Manager by `shared/home-manager/modules/nvim.nix`
 - `files/mac/` holds mac-only source: the Karabiner config and the kitty IME watcher
-- `files/server/` holds server-only source: the btrfs snapshot script and the Minecraft Bedrock Dockerfile
 - Modules pull these in via `builtins.readFile` / store-path references, substituting any Nix values through `@placeholder@` tokens so no import-from-derivation is needed
 
 ## Commands

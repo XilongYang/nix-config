@@ -23,7 +23,6 @@
     ./config/virtualisation.nix
     ./services/btrbk.nix
     ./services/gpg-agent.nix
-    ./services/minecraft-bedrock.nix
     ./services/sshd.nix
     ./services/time-machine.nix
   ];
