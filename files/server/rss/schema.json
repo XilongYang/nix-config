@@ -1,0 +1,88 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "lede",
+    "sections",
+    "dropped"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Subject line, shaped like '11-05 Brief · <the one thing that matters most today>'. Under 60 characters. Always English, whatever language the entries are in."
+    },
+    "lede": {
+      "type": "string",
+      "description": "One or two sentences in English: what in today's batch is actually worth the reader's time. An empty string when nothing is."
+    },
+    "sections": {
+      "type": "array",
+      "description": "Grouped by subject, the group that matters most first. A group holding one entry is still a group.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "heading",
+          "items"
+        ],
+        "properties": {
+          "heading": {
+            "type": "string",
+            "description": "Your own name for the group, in the language its entries share -- English when they do not share one. Never copy a feed's channel title."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "title",
+                "summary",
+                "links"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "The entry's title, in the language its source wrote in. When several sources cover one event, this is one entry whose title names the event itself."
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "Two to four sentences in the language the source wrote in -- never a translation: what happened, and why it is worth reading. Never restate the title, never open with 'This article discusses'."
+                },
+                "links": {
+                  "type": "array",
+                  "description": "Links to the sources. A merged entry lists every one of them, each under a label that distinguishes it from the others.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "label",
+                      "url"
+                    ],
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "description": "What is at the other end of this link, and it must be distinct from every other label in the same entry. The outlet's name alone ('FT', 'HN discussion', a blog's name) when that already tells them apart; when one outlet supplied several of the merged articles, name each one's own angle instead ('FT: the export-curb timeline', 'FT: Beijing's response'). A row of identical labels tells the reader nothing."
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dropped": {
+      "type": "array",
+      "description": "Entries judged not worth reading, by their original titles. Shown collapsed, so the reader can see your taste and correct it.",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

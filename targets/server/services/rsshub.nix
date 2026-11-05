@@ -1,6 +1,6 @@
 {
   # RSSHub turns sites without a feed (bilibili, weibo, github, ...) into RSS.
-  # It only ever needs to be reachable by goeland on this same host, so the
+  # It only ever needs to be reachable by rss-digest on this same host, so the
   # port is bound to loopback and the firewall is left untouched.
   virtualisation.oci-containers.containers.rsshub = {
     # The registry is spelled out on purpose: podman has no default and NixOS

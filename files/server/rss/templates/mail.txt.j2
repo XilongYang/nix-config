@@ -1,0 +1,41 @@
+{#
+  The digest's text/plain part, for clients that prefer it and for reading the
+  mail in a terminal. Same `digest` as mail.html.j2, documented there.
+
+  Whitespace matters here in a way it does not in the HTML part. The renderer
+  sets trim_blocks and lstrip_blocks, so a line holding only a {% %} tag
+  disappears completely and every other line comes out verbatim -- which is
+  why this file has no `{%-` markers: adding one would swallow a real newline.
+#}
+{{ digest.title }}
+{{ '=' * (digest.title | length) }}
+
+{% if digest.notice %}
+{{ digest.notice }}
+
+{% endif %}
+{% if digest.lede %}
+{{ digest.lede }}
+
+{% endif %}
+{% for section in digest.sections %}
+## {{ section.heading }}
+
+{% for item in section['items'] %}
+* {{ item.title }}
+{% if item.summary %}
+  {{ item.summary }}
+{% endif %}
+{% for link in item.links %}
+  {{ link.label }}: {{ link.url }}
+{% endfor %}
+
+{% endfor %}
+{% endfor %}
+{% if digest.dropped %}
+--
+Not included ({{ digest.dropped | length }}):
+{% for title in digest.dropped %}
+  {{ title }}
+{% endfor %}
+{% endif %}

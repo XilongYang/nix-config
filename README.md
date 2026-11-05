@@ -34,7 +34,7 @@ The repository is split by responsibility:
 │   │   ├── karabiner/karabiner.json
 │   │   └── kitty/kitty-nvim-ime.py
 │   ├── server/
-│   │   └── goeland/allow-loopback.patch
+│   │   └── rss/
 │   └── shared/
 │       └── nvim/
 ├── flake.nix
@@ -63,7 +63,8 @@ of living inside a Nix string.
 - `targets/server/default.nix` assembles the NixOS machine
 - `targets/server/config/` holds machine-local configuration such as boot, networking, packages, users, and storage
 - `targets/server/services/` holds server-only NixOS service modules
-- RSS is mail-only: `services/rsshub.nix` runs RSSHub as a podman container bound to `127.0.0.1:1200`, and `services/goeland.nix` mails one merged digest every morning. There is no web reader and nothing is exposed to the network.
+- RSS is mail-only: `services/rsshub.nix` runs RSSHub as a podman container bound to `127.0.0.1:1200`. There is no web reader and nothing is exposed to the network.
+- RSS never sends mail: `services/rss-digest.nix` fetches the feeds, builds one brief, has Claude edit it, and puts the result straight into the mailbox with an IMAP `APPEND`. The model is optional -- when it is unavailable the unedited brief is delivered with a line at the top saying so.
 - `targets/server/home-manager/` holds the Home Manager entry for the server user plus server-only modules
 - `targets/mac/default.nix` assembles the macOS Home Manager profile
 - `targets/mac/modules/` holds mac-only Home Manager modules
@@ -78,7 +79,7 @@ of living inside a Nix string.
 
 - `files/shared/nvim/` holds the Neovim runtime (`init.lua`, `lua/`, `lsp/`) symlinked into Home Manager by `shared/home-manager/modules/nvim.nix`
 - `files/mac/` holds mac-only source: the Karabiner config and the kitty IME watcher
-- `files/server/goeland/allow-loopback.patch` relaxes goeland's hardcoded SSRF guard so it can read the local RSSHub container; applied by an overlay in `targets/server/services/goeland.nix`
+- `files/server/rss/` holds the IMAP digest pipeline driven by `targets/server/services/rss-digest.nix`: `digest.py` (fetch, brief, model, render, `APPEND`, each stage checkpointed so a failed run is re-runnable without spending the model's quota twice), `schema.json` (the digest structure, enforced by `claude --json-schema`), `prompt.md` (the editing instructions, passed as `--system-prompt-file` so the built-in agent prompt is replaced rather than appended to), and `templates/` (`mail.html.j2` and `mail.txt.j2`, which own the mail's appearance -- edit these to restyle it, `digest.py` holds no markup)
 - Modules pull these in via `builtins.readFile` / store-path references, substituting any Nix values through `@placeholder@` tokens so no import-from-derivation is needed
 
 ## Commands

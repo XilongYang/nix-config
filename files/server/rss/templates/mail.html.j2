@@ -1,0 +1,70 @@
+{#
+  The digest's HTML part. Edit freely: nothing in digest.py knows what this
+  looks like, it only hands over `digest` and renders whatever comes back.
+
+  Available:
+    digest.title            subject line, also the <h1> here
+    digest.notice           set only when the model was unavailable; one line
+    digest.lede             one or two sentences, may be empty
+    digest.sections[]       .heading, .items[]
+      .items[]             .title, .summary (may be empty), .links[]
+        .links[]           .label, .url
+    digest.dropped[]        titles the model chose not to include
+
+  Autoescaping is on, so `{{ ... }}` is safe for feed-supplied text. Mail
+  clients ignore most of a stylesheet, so the layout rules stay inline; only
+  the dark-mode overrides need the <style> block, which Apple Mail honours.
+#}
+<style>
+  @media (prefers-color-scheme: dark) {
+    .page  { background: #1c1c1e !important; color: #e6e6e6 !important; }
+    .muted { color: #9a9a9e !important; }
+    .rule  { border-color: #3a3a3c !important; }
+    .note  { background: #2b2410 !important; color: #e8c86a !important; }
+    a      { color: #6ab0ff !important; }
+  }
+</style>
+
+<div class="page" style="font:16px/1.6 -apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;max-width:40em;margin:0 auto;padding:1.5em 1.2em;color:#1a1a1a;background:#fff">
+
+  <h1 style="font-size:1.35em;margin:0 0 .8em">{{ digest.title }}</h1>
+
+  {% if digest.notice %}
+    <p class="note" style="background:#fff8e1;border-left:3px solid #e0a800;margin:0 0 1.2em;padding:.6em .8em;font-size:.9em;color:#604b00">{{ digest.notice }}</p>
+  {% endif %}
+
+  {% if digest.lede %}
+    <p class="muted" style="color:#555;margin:0 0 1.5em">{{ digest.lede }}</p>
+  {% endif %}
+
+  {% for section in digest.sections %}
+    <h2 class="rule" style="font-size:1.05em;border-bottom:1px solid #ddd;padding-bottom:.25em;margin:2em 0 .5em">{{ section.heading }}</h2>
+
+    {% for item in section['items'] %}
+      <div style="margin:1.1em 0">
+        <div style="font-weight:600">{{ item.title }}</div>
+        {% if item.summary %}
+          <div>{{ item.summary }}</div>
+        {% endif %}
+        {% if item.links %}
+          <div class="muted" style="font-size:.88em;margin-top:.25em;color:#666">
+            {% for link in item.links %}
+              {%- if not loop.first %} · {% endif -%}
+              <a href="{{ link.url }}" style="color:#06c;text-decoration:none">{{ link.label }}</a>
+            {%- endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% endfor %}
+
+  {% if digest.dropped %}
+    <details class="muted" style="margin-top:2.5em;color:#888;font-size:.85em">
+      <summary>Not included ({{ digest.dropped | length }})</summary>
+      {% for title in digest.dropped %}
+        <div style="margin-top:.4em">{{ title }}</div>
+      {% endfor %}
+    </details>
+  {% endif %}
+
+</div>
