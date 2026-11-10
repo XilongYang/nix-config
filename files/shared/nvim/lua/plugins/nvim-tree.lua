@@ -13,8 +13,7 @@ return {
           api.config.mappings.default_on_attach(bufnr)
 
           -- 自定义映射
-          vim.keymap.set("n", "l", api.tree.change_root_to_node, opts("CD into directory"))
-          vim.keymap.set("n", "h", api.tree.change_root_to_parent, opts("CD to parent"))
+          vim.keymap.set("n", "h", api.node.open.horizontal, opts("Open horizontal split"))
           vim.keymap.set("n", "v", api.node.open.vertical, opts("Open vertical split"))
         end,
       })
