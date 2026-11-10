@@ -6,6 +6,9 @@ ENGLISH = "com.apple.keylayout.ABC"
 MACISM = "@macism@"
 STATE_FILE = f"/tmp/kitty-nvim-ime-last-{os.environ.get('USER', 'user')}"
 
+# Target we last acted on, to skip redundant macism invocations.
+_applied = None
+
 
 def _macism(*args):
     try:
@@ -30,7 +33,10 @@ def _read_last():
 
 
 def _write_last(value):
-    if value:
+    # Switching the input source is asynchronous, so a query made right after
+    # one can still report ENGLISH. Never persist it: that would bake our own
+    # output in as if it were the user's choice.
+    if value and value != ENGLISH:
         try:
             with open(STATE_FILE, "w", encoding="utf-8") as f:
                 f.write(value + "\n")
@@ -39,14 +45,23 @@ def _write_last(value):
 
 
 def _switch_to_normal():
+    global _applied
+    if _applied == "normal":
+        return
+    _applied = "normal"
+
     current = _macism()
-    if current:
-        _write_last(current)
+    _write_last(current)
     if current != ENGLISH:
         _macism(ENGLISH)
 
 
 def _switch_to_insert():
+    global _applied
+    if _applied == "insert":
+        return
+    _applied = "insert"
+
     saved = _read_last()
     if saved:
         _macism(saved)
