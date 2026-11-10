@@ -24,6 +24,23 @@ vim.keymap.set('n', '<leader>bO', ':BufferLineCloseOthers<CR>', { silent = true,
 vim.keymap.set('n', '<leader>bH', ':BufferLineCloseLeft<CR>', { silent = true, desc = 'Close buffers to the left' })
 vim.keymap.set('n', '<leader>bL', ':BufferLineCloseRight<CR>', { silent = true, desc = 'Close buffers to the right' })
 
+-- 关闭所有 buffer(未保存的保留)
+vim.keymap.set('n', '<leader>bA', function()
+  local kept = 0
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.bo[buf].buflisted then
+      if vim.bo[buf].modified then
+        kept = kept + 1
+      else
+        vim.api.nvim_buf_delete(buf, {})
+      end
+    end
+  end
+  if kept > 0 then
+    vim.notify(string.format('保留了 %d 个未保存的 buffer', kept), vim.log.levels.WARN)
+  end
+end, { silent = true, desc = 'Close all buffers' })
+
 vim.keymap.set("n", "<leader>aa", "<cmd>AerialToggle!<CR>")
 
 vim.keymap.set("n", "<leader>et", vim.diagnostic.open_float, { silent = true })
