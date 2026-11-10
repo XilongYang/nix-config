@@ -2,15 +2,23 @@ local M = {}
 
 local function run(pattern)
   local escaped = vim.fn.shellescape(pattern)
-  local cmd = vim.fn.executable("rg") == 1
+  local has_rg = vim.fn.executable("rg") == 1
+  local cmd = has_rg
     and ("rg --vimgrep --smart-case " .. escaped)
-    or  ("grep -rn " .. escaped .. " .")
+    or  ("grep -rn --exclude-dir=.git " .. escaped .. " .")
   local lines = vim.fn.systemlist(cmd)
   if #lines == 0 then return {} end
 
   local results = {}
   for _, line in ipairs(lines) do
-    local file, lnum, col, text = line:match("^(.-):(%d+):(%d+):(.*)")
+    local file, lnum, col, text
+    if has_rg then
+      file, lnum, col, text = line:match("^(.-):(%d+):(%d+):(.*)")
+    else
+      -- grep -rn has no column number
+      file, lnum, text = line:match("^(.-):(%d+):(.*)")
+      col = 1
+    end
     if file then
       table.insert(results, { file = file, lnum = tonumber(lnum), col = tonumber(col), display = line })
     end
