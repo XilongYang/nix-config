@@ -16,6 +16,9 @@
       PATH=$PATH:$HOME/.local/bin
       stty -ixon
       ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#6b7280'
+      kitty-pop-kbd() { printf '\e[<u' }
+      autoload -Uz add-zsh-hook
+      add-zsh-hook precmd kitty-pop-kbd
     '';
     oh-my-zsh = {
       enable = true;
