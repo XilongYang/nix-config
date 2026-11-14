@@ -1,13 +1,22 @@
 import base64
 import os
 import subprocess
+import time
 
 ENGLISH = "com.apple.keylayout.ABC"
 MACISM = "@macism@"
 STATE_FILE = f"/tmp/kitty-nvim-ime-last-{os.environ.get('USER', 'user')}"
 
+# How long a switch we requested may take to show up in a query.
+SETTLE_S = 0.5
+
 # Target we last acted on, to skip redundant macism invocations.
 _applied = None
+
+# Input source we last asked for, and when, to tell our own output apart from
+# the user's choice.
+_commanded = None
+_commanded_at = 0.0
 
 
 def _macism(*args):
@@ -33,15 +42,33 @@ def _read_last():
 
 
 def _write_last(value):
-    # Switching the input source is asynchronous, so a query made right after
-    # one can still report ENGLISH. Never persist it: that would bake our own
-    # output in as if it were the user's choice.
-    if value and value != ENGLISH:
+    if value:
         try:
             with open(STATE_FILE, "w", encoding="utf-8") as f:
                 f.write(value + "\n")
         except OSError:
             pass
+
+
+def _command(source):
+    global _commanded, _commanded_at
+    _commanded = source
+    _commanded_at = time.monotonic()
+    _macism(source)
+
+
+def _trust(current):
+    # Anything but ENGLISH is the user's pick: we only ever ask for ENGLISH or
+    # for the source we restored, and both mean they chose it.
+    if current != ENGLISH:
+        return True
+
+    # ENGLISH is ambiguous. It is ours if a restore we requested has not landed
+    # yet; past that window the restore must have taken effect, so reading
+    # ENGLISH means the user switched to it themselves.
+    if _commanded is None or _commanded == ENGLISH:
+        return True
+    return time.monotonic() - _commanded_at >= SETTLE_S
 
 
 def _switch_to_normal():
@@ -51,9 +78,10 @@ def _switch_to_normal():
     _applied = "normal"
 
     current = _macism()
-    _write_last(current)
+    if current and _trust(current):
+        _write_last(current)
     if current != ENGLISH:
-        _macism(ENGLISH)
+        _command(ENGLISH)
 
 
 def _switch_to_insert():
@@ -63,8 +91,9 @@ def _switch_to_insert():
     _applied = "insert"
 
     saved = _read_last()
-    if saved:
-        _macism(saved)
+    # Normal mode already left us in ENGLISH; no need to ask for it again.
+    if saved and saved != ENGLISH:
+        _command(saved)
 
 
 def _value(data):
