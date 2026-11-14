@@ -31,6 +31,7 @@ The repository is split by responsibility:
 │       └── modules/
 ├── files/
 │   ├── mac/
+│   │   ├── jpime/jpime.swift
 │   │   ├── karabiner/karabiner.json
 │   │   └── kitty/kitty-nvim-ime.py
 │   ├── server/
@@ -78,7 +79,7 @@ of living inside a Nix string.
 ## Source Files
 
 - `files/shared/nvim/` holds the Neovim runtime (`init.lua`, `lua/`, `lsp/`) symlinked into Home Manager by `shared/home-manager/modules/nvim.nix`
-- `files/mac/` holds mac-only source: the Karabiner config and the kitty IME watcher
+- `files/mac/` holds mac-only source: the Karabiner config, the kitty IME watcher, and `jpime/jpime.swift`, a Carbon TIS CLI that toggles the Japanese input method on and off (⌃⌥J via Karabiner). `targets/mac/modules/jpime.nix` compiles it to `~/.local/bin/jpime` on activation with the system `swiftc`, so that step needs Xcode Command Line Tools and is the one non-Nix dependency of the mac target
 - `files/server/rss/` holds the IMAP digest pipeline driven by `targets/server/services/rss-digest.nix`: `digest.py` (fetch, brief, model, render, `APPEND`, each stage checkpointed so a failed run is re-runnable without spending the model's quota twice), `schema.json` (the digest structure, enforced by `claude --json-schema`), `prompt.md` (the editing instructions, passed as `--system-prompt-file` so the built-in agent prompt is replaced rather than appended to), and `templates/` (`mail.html.j2` and `mail.txt.j2`, which own the mail's appearance -- edit these to restyle it, `digest.py` holds no markup)
 - Modules pull these in via `builtins.readFile` / store-path references, substituting any Nix values through `@placeholder@` tokens so no import-from-derivation is needed
 

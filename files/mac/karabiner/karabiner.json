@@ -314,6 +314,22 @@
                         ]
                     },
                     {
+                        "description": "Ctrl+Option+J to toggle Japanese input method",
+                        "manipulators": [
+                            {
+                                "from": {
+                                    "key_code": "j",
+                                    "modifiers": {
+                                        "mandatory": ["control", "option"],
+                                        "optional": ["caps_lock"]
+                                    }
+                                },
+                                "to": [{ "shell_command": "$HOME/.local/bin/jpime" }],
+                                "type": "basic"
+                            }
+                        ]
+                    },
+                    {
                         "description": "Run Kitty",
                         "manipulators": [
                             {
