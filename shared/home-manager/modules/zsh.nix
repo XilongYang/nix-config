@@ -16,9 +16,12 @@
       PATH=$PATH:$HOME/.local/bin
       stty -ixon
       ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#6b7280'
-      kitty-pop-kbd() { printf '\e[<u' }
+      # Clear terminal modes after ssh disconnect.
+      kitty-reset-modes() {
+        printf '\e[<u\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?1004l'
+      }
       autoload -Uz add-zsh-hook
-      add-zsh-hook precmd kitty-pop-kbd
+      add-zsh-hook precmd kitty-reset-modes
     '';
     oh-my-zsh = {
       enable = true;
