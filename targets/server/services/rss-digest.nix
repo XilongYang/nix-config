@@ -2,23 +2,17 @@
 let
   stateDir = "/var/lib/rss-digest";
 
-  # Secrets and addresses are read at runtime, so neither the iCloud app
-  # password nor the mail addresses land in the Nix store. See the comment at
-  # the bottom for how to create the file.
+  # Read at runtime so no secret lands in the Nix store; created by hand below.
   environmentFile = "${stateDir}/env";
 
-  # "blogs" are people the reader follows deliberately; "news" is a firehose to
-  # be filtered. The group is handed to the model, which treats the two
-  # differently -- see prompt.md. It is the only thing the group does: both
-  # groups land in one digest.
+  # "blogs" are followed deliberately, "news" is a firehose to filter -- the
+  # model is handed the group and treats the two differently, see prompt.md.
   feeds = [
     { name = "xilong"; group = "blogs"; url = "https://xilong.site/atom.xml"; }
     { name = "stephenleng"; group = "blogs"; url = "https://stephenleng.com/cn/feed"; }
     { name = "freemind"; group = "blogs"; url = "https://freemind.pluskid.org/rss.xml"; }
-    # Both FT feeds name their section in the channel title -- "Technology"
-    # and "World" -- rather than the paper, so "source" overrides it. Without
-    # that the model cannot tell the two apart from any other outlet, and a
-    # merged story ends up labelled "Technology · World · World".
+    # Both FT feeds title themselves by section rather than paper, so "source"
+    # overrides it.
     { name = "ft-technology"; group = "news"; source = "FT"; url = "https://www.ft.com/technology?format=rss"; }
     { name = "ft-world"; group = "news"; source = "FT"; url = "https://www.ft.com/world?format=rss"; }
     { name = "hackernews"; group = "news"; url = "https://news.ycombinator.com/rss"; }
@@ -26,42 +20,26 @@ let
 
   feedsFile = (pkgs.formats.json { }).generate "feeds.json" feeds;
 
-  # The whole directory, not each file, so that digest.py can import feedlib.py
-  # from beside itself -- Python puts a script's own directory on sys.path,
-  # which needs no PYTHONPATH as long as the two share a store path. feedlib.py
-  # is the half this shares with podcast-dl.py: fetching, deciding what is new,
-  # and remembering what has been delivered.
+  # The whole directory, so digest.py can import feedlib.py from beside it.
   rssSrc = ../../../files/server/rss;
 
   schemaFile = "${rssSrc}/schema.json";
   promptFile = "${rssSrc}/prompt.md";
 
-  # The mail's appearance lives entirely in these two Jinja templates --
-  # mail.html.j2 and mail.txt.j2 -- and digest.py never looks inside them. Edit
-  # them to restyle the brief; the only contract is the set of fields, which
-  # mail.html.j2 documents at the top. They render both the edited digest and
-  # the unedited brief, so a change cannot leave the fallback mail behind.
+  # The mail's whole appearance, the only contract being the set of fields that
+  # mail.html.j2 documents at its top.
   templateDir = "${rssSrc}/templates";
 
   python = pkgs.python3.withPackages (ps: with ps; [ feedparser html2text jinja2 ]);
 
-  # The script fetches, builds a brief by rule, lets the model edit it, renders
-  # it and APPENDs it, checkpointing each step in ${stateDir}/runs/<date>/ and
-  # committing the seen-state only after the APPEND is acknowledged. So a
-  # failed run can simply be re-run: `systemctl start rss-digest` picks up
-  # where it stopped and does not spend the model's quota twice.
+  # Every step is checkpointed under ${stateDir}/runs/<date>/, so a failed run
+  # can simply be re-run without paying for the model twice.
   #
-  # The model is the one stage that is allowed to be missing. Rate-limited,
-  # expired token, timed out, bad output: the brief goes out as it stands with
-  # a line at the top saying why it was not edited, and that failure is not
-  # checkpointed, so a re-run gets another attempt. `--no-model` forces that
-  # path, which is also the way to see what the brief looks like on its own.
-  # A named binary rather than a bare store path, because every mode but the
-  # daily one is run by hand: seeding the state, re-running a failed delivery,
-  # looking at the brief with --no-model. HOME and CLAUDE_CONFIG_DIR are set
-  # here and not on the unit so that a hand-run and the timer behave alike --
-  # claude keeps its state under $HOME and reads CLAUDE.md from the working
-  # directory, and neither should ever reach outside the state directory.
+  # The model is the one stage allowed to be missing: the brief then goes out
+  # unedited with a line at the top saying why.
+  #
+  # A named binary because every mode but the daily one is run by hand, with
+  # HOME and the working directory set here so both behave alike.
   digest = pkgs.writeShellScriptBin "rss-digest" ''
     export HOME=${stateDir}
     export CLAUDE_CONFIG_DIR=${stateDir}/claude
@@ -96,10 +74,7 @@ in
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
 
-    # --bare would isolate claude more thoroughly, but it refuses to read
-    # anything but ANTHROPIC_API_KEY / apiKeyHelper -- never a subscription
-    # token -- so it is unusable here. The HOME, CLAUDE_CONFIG_DIR and working
-    # directory the wrapper sets cover the same ground for this unit.
+    # --bare would isolate claude further but takes no subscription token.
     path = [ pkgs.claude-code ];
 
     serviceConfig = {
@@ -109,14 +84,11 @@ in
       StateDirectory = "rss-digest";
       StateDirectoryMode = "0750";
       WorkingDirectory = stateDir;
-      # No "-" prefix: a missing file should fail the unit rather than let it
-      # run with no credentials and no idea where to deliver.
+      # No "-" prefix: a missing file should fail the unit, not run blind.
       EnvironmentFile = environmentFile;
       ExecStart = "${digest}/bin/rss-digest";
 
-      # One daily shot at the network and one file tree. Nothing here needs
-      # more, and the unit runs a model with a prompt assembled from untrusted
-      # feed content, so the blast radius is worth keeping small.
+      # A small blast radius for a model prompt built from untrusted feeds.
       PrivateTmp = true;
       ProtectSystem = "strict";
       ProtectHome = true;
@@ -125,9 +97,8 @@ in
     };
   };
 
-  # The environment file is created by hand, once, and never by Nix. It has to
-  # come after the first rebuild: the rss-digest user does not exist until then
-  # and StateDirectory= only creates the directory when the unit first runs.
+  # The environment file is created by hand, once, after the first rebuild --
+  # the rss-digest user does not exist before it.
   #
   #   sudo install -d -o rss-digest -g rss-digest -m 0750 /var/lib/rss-digest
   #   sudo install -o rss-digest -g rss-digest -m 0400 /dev/stdin \
@@ -141,34 +112,24 @@ in
   #   CLAUDE_CODE_OAUTH_TOKEN="sk-ant-oat01-..."
   #   EOF
   #
-  # RSS_IMAP_FOLDER must be a top-level mailbox: iCloud does not take children
-  # under INBOX. The password is an app-specific password, the same kind the
-  # old SMTP path used.
+  # RSS_IMAP_FOLDER must be top-level: iCloud takes no children under INBOX.
+  # The password is an app-specific one.
   #
   # The token comes from `claude setup-token` on a machine already signed in to
-  # the subscription -- it prints an sk-ant-oat01- token to paste above. It is
-  # the whole of the credential: the unit needs no browser login of its own and
-  # no OAuth state, which is why this and not `claude auth login` as the
-  # service user. It does eventually expire, and when it does the unit fails
-  # loudly rather than silently skipping a day; re-run setup-token then.
+  # the subscription, and the unit fails loudly once it expires.
   #
-  # This spends the same quota as interactive use, so the digest competes with
-  # your own sessions for it. Hence sonnet rather than opus above: merging and
-  # summarising is well within it, and the opus quota stays yours. A window
-  # where even sonnet is unavailable costs the editing, not the mail.
+  # It spends the same quota as interactive use, hence sonnet and not opus.
   #
-  # The first run would otherwise digest every feed's entire backlog. Deliver
-  # that backlog once as an unedited brief, which doubles as the check that the
-  # IMAP side works and spends no model quota:
+  # The first run would otherwise digest every backlog, so deliver it once
+  # unedited -- which also checks the IMAP side and spends no quota:
   #
   #   sudo -u rss-digest rss-digest --no-model
   #
-  # Or, to throw the backlog away instead of reading it:
+  # Or throw that backlog away instead of reading it:
   #
   #   sudo -u rss-digest rss-digest --seed-state
   #
-  # And the inverse, to undo a delivery so those entries come back on the next
-  # run -- every feed, or only the ones named:
+  # And the inverse, undoing a delivery for every feed or only the ones named:
   #
   #   sudo -u rss-digest rss-digest --forget
   #   sudo -u rss-digest rss-digest --forget hackernews ft-world

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """RSS -> Claude -> IMAP APPEND.
 
-Four stages. Each writes one file into the day's run directory and is skipped
-when that file already exists, so a failed run can be re-run the same day
-without re-fetching and, more to the point, without paying for the model a
-second time:
+Each stage writes one file into the day's run directory and is skipped when that
+file exists, so a failed run can be re-run without paying for the model twice:
 
     items.json   entries fetched that the state file has not seen
     brief.json   those entries as a digest, grouped and ordered by rule alone
@@ -12,20 +10,14 @@ second time:
     mail.eml     the rendered message
     done         written only after the IMAP server acknowledges the APPEND
 
-The model is one optional stage in the middle, not the pipeline. brief.json is
-produced without it and is already a complete, renderable morning brief; the
-model's job is to merge, judge and summarise that brief into digest.json. When
-it cannot -- rate-limited, token expired, timed out, bad output -- the brief is
-delivered as it stands with one line at the top saying so, and the run is
-counted as delivered. A missing model costs the reader editing, never the mail.
-Note that this stage is therefore deliberately NOT checkpointed when it fails:
-nothing was spent, so a re-run gets another attempt at it.
+The model is one optional stage, not the pipeline: brief.json is already a
+complete morning brief, and when the model cannot edit it the brief goes out as
+it stands with one line at the top saying why.
 
-The seen-state is committed only once "done" exists. Nothing is ever marked
-seen merely because it was fetched, which is what makes a multi-stage pipeline
-safe to retry: a fetcher that records an entry as seen while filtering, before
-anything has been delivered, loses that entry for good the first time a later
-stage fails.
+That failure is deliberately not checkpointed, since nothing was spent on it.
+
+The seen-state is committed only once "done" exists -- nothing is marked seen
+merely because it was fetched, which is what makes a re-run safe.
 """
 
 from __future__ import annotations
@@ -48,9 +40,7 @@ from pathlib import Path
 import html2text
 import jinja2
 
-# Fetching, deciding what is new and remembering what went out are shared with
-# podcast-dl.py, which delivers audio from the same kind of feed list to a
-# directory instead of to a mailbox. See feedlib.py.
+# Shared with podcast-dl.py, which delivers audio instead of mail.
 from feedlib import (
     forget_feeds,
     load_state,
@@ -63,18 +53,15 @@ from feedlib import (
     save_state,
 )
 
-# Per-entry text handed to the model. Long enough for the model to judge an
-# article, short enough that one runaway feed cannot blow up the bill.
+# Enough per entry for the model to judge an article, not enough to run away.
 MAX_ENTRY_CHARS = 4000
 
 
 def load_env_file(path: Path) -> None:
     """Read KEY="value" lines into the environment, without overriding it.
 
-    systemd already supplies these through EnvironmentFile, so this changes
-    nothing under the timer. It exists so that running the command by hand --
-    to seed the state, to re-run a failed delivery, to look at the brief with
-    --no-model -- needs no shell incantation to find the credentials.
+    systemd supplies these through EnvironmentFile, so this is only for the
+    modes run by hand.
     """
     if not path.exists():
         return
@@ -124,11 +111,8 @@ def entry_text(entry) -> str:
 
 def fetch(feeds: list[dict], seen: dict[str, dict]) -> list[dict]:
     items: list[dict] = []
-    # Two feeds of one publication carry the same article often enough to
-    # matter: both FT feeds ran the same midterms piece on the day this was
-    # written. The copy is still recorded as seen under its own feed -- else it
-    # would come back every run -- but only the first is shown or sent to the
-    # model.
+    # Two feeds of one paper carry the same article often enough to matter; the
+    # copy is still recorded as seen, but only the first is shown or sent.
     first_seen_in: dict[str, str] = {}
     for feed in feeds:
         name = feed["name"]
@@ -145,17 +129,14 @@ def fetch(feeds: list[dict], seen: dict[str, dict]) -> list[dict]:
                 {
                     "feed": name,
                     "group": feed.get("group", "default"),
-                    # A feed's own channel title is often useless as a source
-                    # name -- FT's two feeds call themselves "Technology" and
-                    # "World", naming the section rather than the paper -- so
+                    # A channel title is often the section, not the paper, so
                     # the feed list may override it.
                     "source": oneline(feed.get("source") or parsed.feed.get("title", name)),
                     "uid": uid,
                     "title": oneline(entry.get("title", "(untitled)")),
                     "link": entry.get("link", ""),
                     "published": entry.get("published", entry.get("updated", "")),
-                    # Hacker News items are a link plus a discussion; the feed
-                    # keeps the discussion here and almost nothing in the body.
+                    # Where Hacker News keeps the discussion, its body empty.
                     "comments": entry.get("comments", ""),
                     "text": entry_text(entry),
                     "duplicate": duplicate,
@@ -167,8 +148,7 @@ def fetch(feeds: list[dict], seen: dict[str, dict]) -> list[dict]:
 # --------------------------------------------------------------------------
 # stage 2a: the brief, by rule alone
 
-# Groups the reader cares about most, first. A group not named here sorts after
-# these, alphabetically, so adding one to the feed list needs no change.
+# A group not named here sorts after these, alphabetically.
 GROUP_ORDER = ["blogs", "news"]
 GROUP_HEADINGS = {"blogs": "Blogs", "news": "News"}
 
@@ -182,12 +162,7 @@ def presentable(items: list[dict]) -> list[dict]:
 
 
 def build_brief(items: list[dict]) -> dict:
-    """Render the items as a digest without a model.
-
-    Same shape the model is asked to produce, so one renderer serves both: this
-    is what gets delivered when the model is unavailable, and what the model is
-    handed when it is.
-    """
+    """Render the items as a digest without a model, in the model's own shape."""
     def group_key(group: str) -> tuple[int, str]:
         return (GROUP_ORDER.index(group) if group in GROUP_ORDER else len(GROUP_ORDER), group)
 
@@ -199,9 +174,8 @@ def build_brief(items: list[dict]) -> dict:
         entries = []
         for item in members:
             summary = " ".join(item["text"].split())
-            # Some feeds -- Hacker News above all -- carry no body at all, just
-            # a pointer to the discussion. Those links are listed below the
-            # entry anyway, so a summary that is nothing but links is noise.
+            # The links are listed below the entry anyway, so a summary that is
+            # nothing but links is noise.
             if not re.sub(r"\[[^\]]*\]\([^)]*\)", "", summary).strip():
                 summary = ""
             elif len(summary) > BRIEF_SUMMARY_CHARS:
@@ -234,10 +208,9 @@ def build_brief(items: list[dict]) -> dict:
 
 
 def orchestrate(args, items: list[dict]) -> tuple[dict | None, str]:
-    """Hand the items to the model. Returns (digest, "") or (None, reason).
+    """Hand the items to the model, returning (digest, "") or (None, reason).
 
-    Every failure is a reason, never an exit: the caller falls back to the
-    unedited brief. The reason is short because it is shown to the reader.
+    Every failure is a reason and never an exit, shown to the reader as it is.
     """
     payload = {
         "date": dt.date.today().isoformat(),
@@ -253,10 +226,8 @@ def orchestrate(args, items: list[dict]) -> tuple[dict | None, str]:
         "--system-prompt-file", args.prompt,
         "--json-schema", Path(args.schema).read_text(),
         "--model", args.model,
-        # No tools: this is a pure transformation of the payload on stdin, and
-        # a tool call here could only be a web fetch the schema has no slot
-        # for. Both flags together also mean nothing can ever block on a
-        # permission prompt that no one is there to answer.
+        # A pure transformation of stdin, which can then never block on a
+        # permission prompt no one is there to answer.
         "--tools", "",
         "--permission-prompts", "none",
         "--no-session-persistence",
@@ -284,10 +255,8 @@ def orchestrate(args, items: list[dict]) -> tuple[dict | None, str]:
     except json.JSONDecodeError:
         return None, "claude output was not JSON"
 
-    # Wall clock and the thinking share of the output are the two numbers that
-    # explain a slow run, so both go in the journal rather than being
-    # guessed at later. This stage is output-token-bound: it generates serially,
-    # so the time it takes tracks `out`, and thinking is part of `out`.
+    # The two numbers that explain a slow run: this stage generates serially,
+    # so its time tracks `out`, of which thinking is part.
     usage = envelope.get("usage", {})
     log(f"model run: {envelope.get('duration_ms', 0) / 1000:.0f}s, "
         f"{envelope.get('num_turns')} turns, "
@@ -295,8 +264,7 @@ def orchestrate(args, items: list[dict]) -> tuple[dict | None, str]:
         f"({usage.get('output_tokens_details', {}).get('thinking_tokens', 0)} thinking), "
         f"${envelope.get('total_cost_usd', 0):.4f} list-price")
     if envelope.get("is_error"):
-        # The first line is the useful part: "Not logged in", a rate-limit
-        # notice, the budget cap. The rest is for the journal, not the reader.
+        # The first line is the useful part; the rest is for the journal.
         detail = str(envelope.get("result", "")).strip().splitlines()
         log(f"claude failed: {' '.join(detail)}")
         return None, detail[0] if detail else "claude reported an error"
@@ -313,22 +281,20 @@ def orchestrate(args, items: list[dict]) -> tuple[dict | None, str]:
 def render(digest: dict, msg_id: str, template_dir: str) -> EmailMessage:
     """Turn the digest into a mail using the templates, which own the layout.
 
-    Nothing about the appearance of the mail lives in this file: both parts
-    come from template_dir, and the only contract with them is the shape of
-    `digest` -- the same shape whether the model edited it or not.
+    The only contract with them is the shape of `digest`, which is the same
+    whether the model edited it or not.
     """
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(template_dir),
-        # Feed text is not to be trusted in an HTML part; the text part must
-        # not be escaped or it grows &amp; everywhere.
+        # Feed text is not to be trusted in HTML, and escaping the text part
+        # would grow &amp; everywhere.
         autoescape=lambda name: bool(name and name.endswith(".html.j2")),
         trim_blocks=True,
         lstrip_blocks=True,
         undefined=jinja2.StrictUndefined,
     )
-    # StrictUndefined turns a typo in a template into an error instead of a
-    # silently empty mail, which means every key a template may reach for has
-    # to exist. "notice" is the one the model never produces.
+    # StrictUndefined means every key a template may reach for has to exist,
+    # "notice" being the one the model never produces.
     digest = {"title": "", "notice": "", "lede": "", "sections": [], "dropped": [], **digest}
 
     text = env.get_template("mail.txt.j2").render(digest=digest).strip() + "\n"
@@ -339,9 +305,8 @@ def render(digest: dict, msg_id: str, template_dir: str) -> EmailMessage:
     msg["From"] = env_var("RSS_MAIL_FROM")
     msg["To"] = env_var("RSS_MAIL_TO")
     msg["Date"] = email.utils.formatdate(localtime=True)
-    # Stable and derived from the content, so a re-run after a half-failed
-    # APPEND can recognise its own message on the server instead of posting a
-    # duplicate. See append().
+    # Derived from the content, so a re-run after a half-failed APPEND
+    # recognises its own message instead of posting a duplicate.
     msg["Message-ID"] = msg_id
     msg.set_content(text)
     msg.add_alternative(body, subtype="html")
@@ -354,18 +319,15 @@ def render(digest: dict, msg_id: str, template_dir: str) -> EmailMessage:
 
 def append(msg: EmailMessage, folder: str) -> None:
     host = env_var("RSS_IMAP_HOST")
-    # A first deployment fails here more often than anywhere else -- wrong
-    # host, app password not created, folder nested under INBOX -- so say what
-    # happened in one line instead of a traceback. Nothing has been committed
-    # at this point, so fixing the cause and re-running is the whole recovery.
+    # A first deployment fails here more often than anywhere else, and nothing
+    # is committed yet, so one line beats a traceback.
     try:
         conn = imaplib.IMAP4_SSL(host)
     except OSError as err:
         sys.exit(f"cannot reach {host}: {err}")
     try:
         conn.login(env_var("RSS_IMAP_USER"), env_var("RSS_IMAP_PASSWORD"))
-        # iCloud has the folder already in practice; create() on an existing
-        # mailbox is an error we do not care about.
+        # create() on an existing mailbox is an error we do not care about.
         conn.create(folder)
         status, _ = conn.select(folder)
         if status != "OK":
@@ -373,12 +335,10 @@ def append(msg: EmailMessage, folder: str) -> None:
         msg_id = msg["Message-ID"]
         status, data = conn.uid("SEARCH", "HEADER", "Message-ID", msg_id)
         if status != "OK":
-            # Not fatal: the worst case is a duplicate, and only if a previous
-            # run's APPEND did land. Losing the digest would be worse.
+            # Not fatal: the worst case is a duplicate, losing it is worse.
             log(f"cannot search {folder} for {msg_id}, appending anyway")
-        # A no-match reply comes back as [None] from iCloud and as [b""]
-        # elsewhere, so neither the list nor its contents can be trusted to be
-        # the shape imaplib's docs suggest.
+        # A no-match reply is [None] from iCloud and [b""] elsewhere, neither
+        # of them the shape imaplib's docs suggest.
         elif b" ".join(filter(None, data or [])).split():
             log(f"{msg_id} already on the server, not appending again")
             return
@@ -412,36 +372,25 @@ def main() -> None:
     parser.add_argument("--env-file", default=None,
                         help="credentials file; defaults to env in --state-dir")
     parser.add_argument("--model", default="sonnet")
-    # Measured: 72 entries took 411s, 44.7k output tokens at ~109 tokens/s --
-    # this stage is output-bound and generates serially, so the time scales
-    # with how much there is to write. A first run over a full backlog is
-    # several times a normal day's volume, so the ceiling is set for that case,
-    # not for the daily one.
+    # Measured: 72 entries took 411s, so the ceiling is set for a first run
+    # over a whole backlog rather than for a daily one.
     parser.add_argument("--timeout", type=int, default=1800,
                         help="seconds to let the model run before giving up "
                              "and delivering the unedited brief")
-    # The model layer is optional by design; this turns it off outright, for
-    # testing the brief or for running without a usable token at all.
+    # For testing the brief, or running without a usable token at all.
     parser.add_argument("--no-model", action="store_true",
                         help="deliver the unedited brief, do not call the model")
-    # Under a subscription this is not a bill -- claude reports cost at list
-    # price for accounting only -- so it serves purely as a runaway guard: a
-    # feed that suddenly emits thousands of entries aborts instead of eating
-    # the day's quota.
+    # Not a bill under a subscription, purely a guard against a feed that
+    # suddenly emits thousands of entries.
     parser.add_argument("--max-budget", type=float, default=2.0)
     parser.add_argument("--folder", default=os.environ.get("RSS_IMAP_FOLDER", "RSS"))
-    # Run once, by hand, when a feed is added or the state is lost: records
-    # everything currently in the feeds as seen and sends nothing. Without it
-    # the first run digests each feed's entire backlog -- 72 entries across
-    # these six feeds, when last measured. An exact guard rather than the usual
-    # "only entries newer than N hours" approximation.
+    # Run by hand when a feed is added or the state is lost, so that the next
+    # run does not digest the whole backlog.
     parser.add_argument("--seed-state", action="store_true",
                         help="mark everything currently in the feeds as seen "
                              "and exit without producing a digest")
-    # The inverse of --seed-state, and the way to undo a delivery: the entries
-    # come back on the next run as though they had never been sent. Today's run
-    # directory goes with them, because leaving "done" behind would make that
-    # next run refuse to do anything.
+    # The way to undo a delivery, today's run directory going with it -- a
+    # leftover "done" would make the next run refuse to do anything.
     parser.add_argument("--forget", nargs="*", metavar="FEED", default=None,
                         help="drop the delivery record for these feeds, or for "
                              "every feed when given no names, and exit")
@@ -473,10 +422,8 @@ def main() -> None:
         log(f"seeded {len(items)} items as seen, nothing sent")
         return
 
-    # A completed run is not repeated. Re-running after a failure resumes from
-    # the last checkpoint instead, because "done" is the one file that only
-    # exists once the IMAP server has acknowledged the message. To deliberately
-    # produce a second digest the same day, remove the day's run directory.
+    # A completed run is not repeated; remove the day's run directory to
+    # deliberately produce a second digest.
     done = run_dir / "done"
     if done.exists():
         log(f"already delivered today ({done.read_text()}), nothing to do")
@@ -493,8 +440,7 @@ def main() -> None:
         log("nothing new")
         return
 
-    # The brief always exists, with or without a model. It is both the
-    # fallback mail and the model's input.
+    # Always built: it is both the fallback mail and the model's input.
     brief = build_brief(items)
     (run_dir / "brief.json").write_text(json.dumps(brief, ensure_ascii=False, indent=1))
 
@@ -509,9 +455,8 @@ def main() -> None:
         edited, reason = orchestrate(args, items)
         if edited:
             digest = edited
-            # Only a successful edit is checkpointed. A failure is not, so a
-            # re-run tries the model again rather than re-delivering a brief
-            # that nothing was spent on.
+            # Only a successful edit is checkpointed, so a re-run after a
+            # failure tries the model again.
             digest_file.write_text(json.dumps(digest, ensure_ascii=False, indent=1))
         else:
             digest = brief
@@ -519,8 +464,8 @@ def main() -> None:
                                 f"What follows is the raw brief.")
             log(f"falling back to the unedited brief: {reason}")
 
-    # Hash the uids rather than the rendered mail, so re-rendering (a template
-    # change, say) does not change the identity of a digest already delivered.
+    # The uids and not the rendered mail, so a template change cannot alter the
+    # identity of a digest already delivered.
     seed = "".join(sorted(item["uid"] for item in items)).encode()
     domain = email.utils.parseaddr(env_var("RSS_MAIL_FROM"))[1].partition("@")[2] or "localhost"
     msg_id = (f"<rss-digest.{dt.date.today():%Y%m%d}."
@@ -533,8 +478,7 @@ def main() -> None:
     append(msg, args.folder)
     done.write_text(dt.datetime.now().isoformat())
 
-    # Only now is it safe to forget these entries. These feeds offer days, not
-    # years, so a record older than their own window can never match again.
+    # Safe only now, and only because these feeds offer days and not years.
     for item in items:
         mark_seen(seen, item["feed"], item["uid"])
     save_state(state_file, prune_state(seen, keep_days=60))
