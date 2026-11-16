@@ -244,7 +244,8 @@ def main() -> None:
     parser.add_argument("--max-per-feed", type=int, default=3,
                         help="most episodes to fetch per feed per run")
     parser.add_argument("--keep-days", type=int, default=30,
-                        help="delete episodes this many days after downloading them")
+                        help="how far back in a feed to fetch, and how many "
+                             "days after downloading an episode to delete it")
     parser.add_argument("--timeout", type=int, default=300,
                         help="seconds of silence on the socket before giving up")
     # The first thing to run after adding a show.
@@ -275,15 +276,26 @@ def main() -> None:
         if parsed is None:
             continue
         fresh = new_entries(feed, parsed, seen)
+        if args.seed_state and not args.dry_run:
+            # Everything the feed carries, past the window and the per-run cap
+            # both, because a slate half wiped is worse than not wiped at all.
+            for entry, uid in fresh:
+                mark_seen(seen, feed["name"], uid)
+            log(f"    {len(fresh)} marked as delivered")
+            continue
         # Newest first, then cut: a feed's whole history must never be fetched.
         fresh.sort(key=lambda pair: pair[0].get("published_parsed") or (), reverse=True)
-        for entry, uid in fresh[:feed.get("maxPerRun", args.max_per_feed)]:
+        # Never fetched, and never recorded either: prune() deletes on this same
+        # keep_days, so a back catalogue is bandwidth for nothing.
+        cutoff = dt.date.today() - dt.timedelta(days=args.keep_days)
+        recent = [pair for pair in fresh if episode_date(pair[0]) >= cutoff]
+        if len(recent) < len(fresh):
+            log(f"    {len(fresh) - len(recent)} older than "
+                f"{args.keep_days} days, left alone")
+        for entry, uid in recent[:feed.get("maxPerRun", args.max_per_feed)]:
             url, declared = audio_enclosure(entry)
             if args.dry_run:
                 describe(entry, url, declared)
-                continue
-            if args.seed_state:
-                mark_seen(seen, feed["name"], uid)
                 continue
             if not url:
                 # Recorded, or it occupies one of this feed's slots every run.
