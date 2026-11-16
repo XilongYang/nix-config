@@ -45,17 +45,27 @@ import time
 from email.message import EmailMessage
 from pathlib import Path
 
-import feedparser
 import html2text
 import jinja2
+
+# Fetching, deciding what is new and remembering what went out are shared with
+# podcast-dl.py, which delivers audio from the same kind of feed list to a
+# directory instead of to a mailbox. See feedlib.py.
+from feedlib import (
+    forget_feeds,
+    load_state,
+    log,
+    mark_seen,
+    new_entries,
+    oneline,
+    parse_feed,
+    prune_state,
+    save_state,
+)
 
 # Per-entry text handed to the model. Long enough for the model to judge an
 # article, short enough that one runaway feed cannot blow up the bill.
 MAX_ENTRY_CHARS = 4000
-
-
-def log(msg: str) -> None:
-    print(msg, file=sys.stderr, flush=True)
 
 
 def load_env_file(path: Path) -> None:
@@ -96,26 +106,6 @@ def env_var(name: str) -> str:
 # stage 1: fetch
 
 
-def entry_uid(entry) -> str:
-    """Stable identity for an entry.
-
-    Prefer the feed's own guid, fall back to the link, and only then to a hash
-    of the title plus date -- a feed that supplies neither is rare but must not
-    produce a new uid on every run.
-    """
-    for key in ("id", "link"):
-        value = entry.get(key)
-        if value:
-            return str(value)
-    seed = (entry.get("title", "") + entry.get("published", "")).encode()
-    return "sha1:" + hashlib.sha1(seed).hexdigest()
-
-
-def oneline(value: str) -> str:
-    """Feed titles arrive with line breaks in them often enough to matter."""
-    return " ".join(str(value).split())
-
-
 def entry_text(entry) -> str:
     html_body = ""
     if entry.get("content"):
@@ -142,19 +132,10 @@ def fetch(feeds: list[dict], seen: dict[str, dict]) -> list[dict]:
     first_seen_in: dict[str, str] = {}
     for feed in feeds:
         name = feed["name"]
-        parsed = feedparser.parse(feed["url"])
-        # bozo means the parser hit malformed XML. It still returns whatever it
-        # could salvage, so this is a warning and not a reason to abort a run
-        # over the other feeds.
-        if parsed.bozo and not parsed.entries:
-            log(f"{name}: fetch failed: {parsed.get('bozo_exception')}")
+        parsed = parse_feed(feed)
+        if parsed is None:
             continue
-        known = seen.get(name, {})
-        fresh = 0
-        for entry in parsed.entries:
-            uid = entry_uid(entry)
-            if uid in known:
-                continue
+        for entry, uid in new_entries(feed, parsed, seen):
             duplicate = uid in first_seen_in
             if duplicate:
                 log(f"{name}: {uid} already came from {first_seen_in[uid]}")
@@ -180,8 +161,6 @@ def fetch(feeds: list[dict], seen: dict[str, dict]) -> list[dict]:
                     "duplicate": duplicate,
                 }
             )
-            fresh += 1
-        log(f"{name}: {fresh} new of {len(parsed.entries)}")
     return items
 
 
@@ -474,17 +453,12 @@ def main() -> None:
     run_dir = state_dir / "runs" / dt.date.today().isoformat()
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    seen: dict[str, dict] = json.loads(state_file.read_text()) if state_file.exists() else {}
+    seen: dict[str, dict] = load_state(state_file)
     feeds = json.loads(Path(args.feeds).read_text())
 
     if args.forget is not None:
-        names = args.forget or sorted(seen)
-        for name in names:
-            if name in seen:
-                log(f"{name}: forgetting {len(seen.pop(name))} entries")
-            else:
-                log(f"{name}: no delivery record to forget")
-        state_file.write_text(json.dumps(seen, ensure_ascii=False, indent=1))
+        forget_feeds(seen, args.forget or sorted(seen))
+        save_state(state_file, seen)
         if run_dir.exists():
             shutil.rmtree(run_dir)
             log(f"removed today's run directory {run_dir}")
@@ -494,8 +468,8 @@ def main() -> None:
     if args.seed_state:
         items = fetch(feeds, seen)
         for item in items:
-            seen.setdefault(item["feed"], {})[item["uid"]] = dt.date.today().isoformat()
-        state_file.write_text(json.dumps(seen, ensure_ascii=False, indent=1))
+            mark_seen(seen, item["feed"], item["uid"])
+        save_state(state_file, seen)
         log(f"seeded {len(items)} items as seen, nothing sent")
         return
 
@@ -559,17 +533,11 @@ def main() -> None:
     append(msg, args.folder)
     done.write_text(dt.datetime.now().isoformat())
 
-    # Only now is it safe to forget these entries.
+    # Only now is it safe to forget these entries. These feeds offer days, not
+    # years, so a record older than their own window can never match again.
     for item in items:
-        seen.setdefault(item["feed"], {})[item["uid"]] = dt.date.today().isoformat()
-    cutoff = (dt.date.today() - dt.timedelta(days=60)).isoformat()
-    seen = {
-        feed: {uid: day for uid, day in uids.items() if day >= cutoff}
-        for feed, uids in seen.items()
-    }
-    tmp = state_file.with_suffix(".tmp")
-    tmp.write_text(json.dumps(seen, ensure_ascii=False, indent=1))
-    tmp.replace(state_file)
+        mark_seen(seen, item["feed"], item["uid"])
+    save_state(state_file, prune_state(seen, keep_days=60))
     log(f"committed {len(items)} items as seen")
 
 

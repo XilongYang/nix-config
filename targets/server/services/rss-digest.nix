@@ -1,14 +1,5 @@
 { config, lib, pkgs, ... }:
 let
-  # No source goes through RSSHub yet. When one does, add it below like any
-  # other feed -- the route list is at https://docs.rsshub.app
-  #
-  #   { name = "weibo"; group = "news"; url = "${rsshub}/weibo/user/<uid>"; }
-  #
-  # Nothing in this pipeline refuses to dial loopback, so reaching the
-  # container takes no patched fetcher.
-  rsshub = "http://127.0.0.1:1200";
-
   stateDir = "/var/lib/rss-digest";
 
   # Secrets and addresses are read at runtime, so neither the iCloud app
@@ -34,15 +25,23 @@ let
   ];
 
   feedsFile = (pkgs.formats.json { }).generate "feeds.json" feeds;
-  schemaFile = ../../../files/server/rss/schema.json;
-  promptFile = ../../../files/server/rss/prompt.md;
+
+  # The whole directory, not each file, so that digest.py can import feedlib.py
+  # from beside itself -- Python puts a script's own directory on sys.path,
+  # which needs no PYTHONPATH as long as the two share a store path. feedlib.py
+  # is the half this shares with podcast-dl.py: fetching, deciding what is new,
+  # and remembering what has been delivered.
+  rssSrc = ../../../files/server/rss;
+
+  schemaFile = "${rssSrc}/schema.json";
+  promptFile = "${rssSrc}/prompt.md";
 
   # The mail's appearance lives entirely in these two Jinja templates --
   # mail.html.j2 and mail.txt.j2 -- and digest.py never looks inside them. Edit
   # them to restyle the brief; the only contract is the set of fields, which
   # mail.html.j2 documents at the top. They render both the edited digest and
   # the unedited brief, so a change cannot leave the fallback mail behind.
-  templateDir = ../../../files/server/rss/templates;
+  templateDir = "${rssSrc}/templates";
 
   python = pkgs.python3.withPackages (ps: with ps; [ feedparser html2text jinja2 ]);
 
@@ -67,7 +66,8 @@ let
     export HOME=${stateDir}
     export CLAUDE_CONFIG_DIR=${stateDir}/claude
     cd ${stateDir}
-    exec ${python}/bin/python3 ${../../../files/server/rss/digest.py} \
+    export PYTHONDONTWRITEBYTECODE=1
+    exec ${python}/bin/python3 ${rssSrc}/digest.py \
       --feeds ${feedsFile} \
       --schema ${schemaFile} \
       --prompt ${promptFile} \
@@ -93,10 +93,8 @@ in
     description = "RSS digest, edited by Claude, delivered by IMAP APPEND";
     startAt = "08:00";
 
-    # RSSHub only matters once a feed above points at it, but starting after it
-    # costs nothing and saves a confusing first failure when one does.
-    after = [ "network-online.target" "podman-rsshub.service" ];
-    wants = [ "network-online.target" "podman-rsshub.service" ];
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
 
     # --bare would isolate claude more thoroughly, but it refuses to read
     # anything but ANTHROPIC_API_KEY / apiKeyHelper -- never a subscription

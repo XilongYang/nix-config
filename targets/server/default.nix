@@ -23,8 +23,8 @@
     ./config/virtualisation.nix
     ./services/btrbk.nix
     ./services/gpg-agent.nix
+    ./services/podcast-dl.nix
     ./services/rss-digest.nix
-    ./services/rsshub.nix
     ./services/sshd.nix
     ./services/time-machine.nix
   ];
